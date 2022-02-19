@@ -23,6 +23,8 @@ from pytorchyolo.test import _evaluate, _create_validation_data_loader
 from terminaltables import AsciiTable
 
 from torchsummary import summary
+import nvidia_dlprof_pytorch_nvtx
+
 
 
 def _create_data_loader(img_path, batch_size, img_size, n_cpu, multiscale_training=False):
@@ -58,11 +60,12 @@ def _create_data_loader(img_path, batch_size, img_size, n_cpu, multiscale_traini
 
 
 def run():
+    nvidia_dlprof_pytorch_nvtx.init()
     print_environment_info()
     parser = argparse.ArgumentParser(description="Trains the YOLO model.")
     parser.add_argument("-m", "--model", type=str, default="config/yolov3.cfg", help="Path to model definition file (.cfg)")
     parser.add_argument("-d", "--data", type=str, default="config/coco.data", help="Path to data config file (.data)")
-    parser.add_argument("-e", "--epochs", type=int, default=300, help="Number of epochs")
+    parser.add_argument("-e", "--epochs", type=int, default=3, help="Number of epochs")
     parser.add_argument("-v", "--verbose", action='store_true', help="Makes the training more verbose")
     parser.add_argument("--n_cpu", type=int, default=8, help="Number of cpu threads to use during batch generation")
     parser.add_argument("--pretrained_weights", type=str, help="Path to checkpoint file (.weights or .pth). Starts training from checkpoint model")
@@ -149,49 +152,50 @@ def run():
     # e.g. when you stop after 30 epochs and evaluate every 10 epochs then the evaluations happen after: 10,20,30
     # instead of: 0, 10, 20
     for epoch in range(1, args.epochs+1):
+        with torch.autograd.profiler.emit_nvtx():
 
-        print("\n---- Training Model ----")
+            print("\n---- Training Model ----")
 
-        model.train()  # Set model to training mode
+            model.train()  # Set model to training mode
 
-        for batch_i, (_, imgs, targets) in enumerate(tqdm.tqdm(dataloader, desc=f"Training Epoch {epoch}")):
-            batches_done = len(dataloader) * epoch + batch_i
+            for batch_i, (_, imgs, targets) in enumerate(tqdm.tqdm(dataloader, desc=f"Training Epoch {epoch}")):
+                batches_done = len(dataloader) * epoch + batch_i
 
-            imgs = imgs.to(device, non_blocking=True)
-            targets = targets.to(device)
+                imgs = imgs.to(device, non_blocking=True)
+                targets = targets.to(device)
 
-            outputs = model(imgs)
+                outputs = model(imgs)
 
-            loss, loss_components = compute_loss(outputs, targets, model)
+                loss, loss_components = compute_loss(outputs, targets, model)
 
-            loss.backward()
+                loss.backward()
 
-            ###############
-            # Run optimizer
-            ###############
-
-            if batches_done % model.hyperparams['subdivisions'] == 0:
-                # Adapt learning rate
-                # Get learning rate defined in cfg
-                lr = model.hyperparams['learning_rate']
-                if batches_done < model.hyperparams['burn_in']:
-                    # Burn in
-                    lr *= (batches_done / model.hyperparams['burn_in'])
-                else:
-                    # Set and parse the learning rate to the steps defined in the cfg
-                    for threshold, value in model.hyperparams['lr_steps']:
-                        if batches_done > threshold:
-                            lr *= value
-                # Log the learning rate
-                logger.scalar_summary("train/learning_rate", lr, batches_done)
-                # Set learning rate
-                for g in optimizer.param_groups:
-                    g['lr'] = lr
-
+                ###############
                 # Run optimizer
-                optimizer.step()
-                # Reset gradients
-                optimizer.zero_grad()
+                ###############
+
+                if batches_done % model.hyperparams['subdivisions'] == 0:
+                    # Adapt learning rate
+                    # Get learning rate defined in cfg
+                    lr = model.hyperparams['learning_rate']
+                    if batches_done < model.hyperparams['burn_in']:
+                        # Burn in
+                        lr *= (batches_done / model.hyperparams['burn_in'])
+                    else:
+                        # Set and parse the learning rate to the steps defined in the cfg
+                        for threshold, value in model.hyperparams['lr_steps']:
+                            if batches_done > threshold:
+                                lr *= value
+                    # Log the learning rate
+                    logger.scalar_summary("train/learning_rate", lr, batches_done)
+                    # Set learning rate
+                    for g in optimizer.param_groups:
+                        g['lr'] = lr
+
+                    # Run optimizer
+                    optimizer.step()
+                    # Reset gradients
+                    optimizer.zero_grad()
 
             # ############
             # Log progress
@@ -232,6 +236,7 @@ def run():
         # ########
 
         if epoch % args.evaluation_interval == 0:
+            continue
             print("\n---- Evaluating Model ----")
             # Evaluate the model on the validation set
             metrics_output = _evaluate(
@@ -256,4 +261,5 @@ def run():
 
 
 if __name__ == "__main__":
+    nvidia_dlprof_pytorch_nvtx.init()
     run()
