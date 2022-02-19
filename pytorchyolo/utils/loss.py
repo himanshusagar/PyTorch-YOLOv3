@@ -67,9 +67,9 @@ def compute_loss(predictions, targets, model):
 
     # Define different loss functions classification
     BCEcls = nn.BCEWithLogitsLoss(
-        pos_weight=torch.tensor([1.0], device=device ,dtype=torch.float16 ))
+        pos_weight=torch.tensor([1.0], device=device ,dtype=torch.float64 ))
     BCEobj = nn.BCEWithLogitsLoss(
-        pos_weight=torch.tensor([1.0], device=device ,dtype=torch.float16 ))
+        pos_weight=torch.tensor([1.0], device=device ,dtype=torch.float64 ))
 
     # Calculate losses for each yolo layer
     for layer_index, layer_predictions in enumerate(predictions):
@@ -140,7 +140,7 @@ def build_targets(p, targets, model):
         anchors = yolo_layer.anchors / yolo_layer.stride
         # Add the number of yolo cells in this layer the gain tensor
         # The gain tensor matches the collums of our targets (img id, class, x, y, w, h, anchor id)
-        gain[2:6] = torch.tensor(p[i].shape , dtype=torch.float16 )[[3, 2, 3, 2]]  # xyxy gain
+        gain[2:6] = torch.tensor(p[i].shape , dtype=torch.float64 )[[3, 2, 3, 2]]  # xyxy gain
         # Scale targets by the number of yolo layer cells, they are now in the yolo cell coordinate system
         t = targets * gain
         # Check if we have targets

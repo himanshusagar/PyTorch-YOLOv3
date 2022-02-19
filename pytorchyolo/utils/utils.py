@@ -347,7 +347,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
         # Filter by class
         if classes is not None:
-            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device , dtype=torch.float16)).any(1)]
+            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device , dtype=torch.float64)).any(1)]
 
         # Check shape
         n = x.shape[0]  # number of boxes

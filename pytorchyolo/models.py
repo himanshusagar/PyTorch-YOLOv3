@@ -135,7 +135,7 @@ class YOLOLayer(nn.Module):
         self.no = num_classes + 5  # number of outputs per anchor
         self.grid = torch.zeros(1)  # TODO
 
-        anchors = torch.tensor(list(chain(*anchors))).half().view(-1, 2)
+        anchors = torch.tensor(list(chain(*anchors))).double().view(-1, 2)
         self.register_buffer('anchors', anchors)
         self.register_buffer(
             'anchor_grid', anchors.clone().view(1, -1, 1, 1, 2))
@@ -161,7 +161,7 @@ class YOLOLayer(nn.Module):
     @staticmethod
     def _make_grid(nx=20, ny=20):
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)], indexing='ij')
-        return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).half()
+        return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).double()
 
 
 class Darknet(nn.Module):
@@ -205,7 +205,7 @@ class Darknet(nn.Module):
             header = np.fromfile(f, dtype=np.int32, count=5)
             self.header_info = header  # Needed to write header when saving weights
             self.seen = header[3]  # number of images seen during training
-            weights = np.fromfile(f, dtype=np.float16)  # The rest are weights
+            weights = np.fromfile(f, dtype=np.float64)  # The rest are weights
 
         # Establish cutoff for loading backbone weights
         cutoff = None
